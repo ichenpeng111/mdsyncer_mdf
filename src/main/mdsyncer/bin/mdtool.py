@@ -46,6 +46,8 @@ class Variable():
     DATAX_BIN_PATH = os.path.abspath(DATAX_PATH + os.sep + 'bin')
     # datax_log目录
     DATAX_LOG_PATH = os.path.abspath(DATAX_PATH + os.sep + 'log')
+    # pg库的默认schema名称
+    PG_SCHEMA = 'public'
 
 
 # 日志工具
@@ -124,13 +126,14 @@ from dbutils.pooled_db import PooledDB
 # 数据库操作
 class DbManager():
     # 构建
-    def __init__(self, host, port, user, passwd, dbname, dbtype):
+    def __init__(self, host, port, user, passwd, dbname, dbtype, schema=None):
         self.host = host
         self.port = port
         self.user = user
         self.passwd = passwd
         self.dbname = dbname
         self.dbtype = dbtype.lower()
+        self.schema = Variable.PG_SCHEMA if schema is None else schema
         self.conn = None
         self.cur = None
 
@@ -216,7 +219,8 @@ class DbManager():
                     port=int(self.port),
                     user=self.user,
                     password=self.passwd,
-                    database=self.dbname
+                    database=self.dbname,
+                    options="-c search_path="+self.schema
                 )
             else:
                 log.error("数据库类型错误，请检查后重新处理")
@@ -403,7 +407,7 @@ class xmler():
 
 
 if __name__ == '__main__':
-    print(Crypter.encrypt('zte@2016'))
+    print(Crypter.encrypt('123456'))
     print(Crypter.decrypt('UPscGj8PuIBzZEvuJqdiMz/u0mbrxwVQh06nTFIM3Esg0tD2B0iADAa6Zf0MGescBtPzpbVdoRolX7+Ce3+D6A=='))
     if len(sys.argv) == 3:
         if sys.argv[1] == '-ep':

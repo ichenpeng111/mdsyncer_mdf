@@ -22,6 +22,10 @@ class MysqlDialect():
             self.dbtype = value['dbtype'].lower()
         # 调用工具类
         self.dbsrc_executor = mdtool.DbManager(self.host, self.port, self.user, self.passwd, self.dbname, self.dbtype)
+
+        # keys
+        for key in dbmgr.keys():
+            self.keys_mgr = key
         # values
         for value in dbmgr.values():
             self.host_mgr = value['host']
@@ -29,10 +33,17 @@ class MysqlDialect():
             self.user_mgr = value['user']
             self.passwd_mgr = value['passwd']
             self.dbname_mgr = value['dbname']
-            self.dbtype_mgr = value['dbtype']
+            self.dbtype_mgr = value['dbtype'].lower()
+            self.schema = None
+            if self.dbtype_mgr == 'postgresql':
+                if value.get('schema'):
+                    self.schema = value['schema']
+                else:
+                    self.schema = mdtool.Variable.PG_SCHEMA
+                    mdtool.log.warn("%s 管理库缺失schema" % self.keys_mgr)
         # 管理库
         self.dbmgr_executor = mdtool.DbManager(self.host_mgr, self.port_mgr, self.user_mgr, self.passwd_mgr,
-                                               self.dbname_mgr, self.dbtype_mgr)
+                                               self.dbname_mgr, self.dbtype_mgr, self.schema)
 
     # 表信息
     def mdsyncer_tables(self):

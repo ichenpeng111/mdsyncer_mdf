@@ -20,8 +20,17 @@ class PGDialect():
             self.passwd = value['passwd']
             self.dbname = value['dbname']
             self.dbtype = value['dbtype'].lower()
+            if value.get('schema'):
+                self.schema = value['schema']
+            else:
+                self.schema = mdtool.Variable.PG_SCHEMA
+                mdtool.log.warn("%s 源库缺失schema" % self.keys)
         # 调用工具类
-        self.dbsrc_executor = mdtool.DbManager(self.host, self.port, self.user, self.passwd, self.dbname, self.dbtype)
+        self.dbsrc_executor = mdtool.DbManager(self.host, self.port, self.user, self.passwd, self.dbname, self.dbtype,
+                                               self.schema)
+        # keys
+        for key in dbmgr.keys():
+            self.keys_mgr = key
         # values
         for value in dbmgr.values():
             self.host_mgr = value['host']
@@ -29,24 +38,32 @@ class PGDialect():
             self.user_mgr = value['user']
             self.passwd_mgr = value['passwd']
             self.dbname_mgr = value['dbname']
-            self.dbtype_mgr = value['dbtype']
+            self.dbtype_mgr = value['dbtype'].lower()
+            self.schema = None
+            if self.dbtype_mgr == 'postgresql':
+                if value.get('schema'):
+                    self.schema = value['schema']
+                else:
+                    self.schema = mdtool.Variable.PG_SCHEMA
+                    mdtool.log.warn("%s 管理库缺失schema" % self.keys_mgr)
         # 管理库
         self.dbmgr_executor = mdtool.DbManager(self.host_mgr, self.port_mgr, self.user_mgr, self.passwd_mgr,
-                                               self.dbname_mgr, self.dbtype_mgr)
-        # schema获取
-        query = """
-        SHOW SEARCH_PATH
-        """
-        result = self.dbsrc_executor.dbfetchone(query, None)
-        # self.dbschema = result[0]
-        self.dbschema = self.dbname.lower()
+                                               self.dbname_mgr, self.dbtype_mgr, self.schema)
+        # schema 改成从conf数据库配置文件中填写，如果不填，默认为public
+        # # schema获取
+        # query = """
+        # SHOW SEARCH_PATH
+        # """
+        # result = self.dbsrc_executor.dbfetchone(query, None)
+        # # self.dbschema = result[0]
+        # self.dbschema = self.dbname.lower()
 
     # 表信息
     def mdsyncer_tables(self):
         self.dbmgr_executor.dbexecute(
             "delete from mdsyncer_tables_tabdb where db_type = '%s' and auth_id = '%s'" % (self.dbtype, self.keys),
             None)
-        params = (self.keys, self.dbtype, self.dbschema)
+        params = (self.keys, self.dbtype, self.schema)
         query = """
         SELECT 
             %s,
@@ -81,7 +98,7 @@ class PGDialect():
         self.dbmgr_executor.dbexecute(
             "delete from mdsyncer_columns_tabdb where db_type = '%s' and auth_id = '%s'" % (self.dbtype, self.keys),
             None)
-        params = (self.keys, self.dbtype, self.dbschema)
+        params = (self.keys, self.dbtype, self.schema)
         query = """
         SELECT 
             %s,
@@ -156,7 +173,7 @@ class PGDialect():
         if flag[0][0] == 0:
             mdtool.log.warning('postgresql不存在约束')
         else:
-            params = (self.keys, self.dbtype, self.dbschema)
+            params = (self.keys, self.dbtype, self.schema)
             query = """
             SELECT 
                 %s,
@@ -223,7 +240,7 @@ class PGDialect():
     def tables_indexes(self):
         self.dbmgr_executor.dbexecute(
             "delete from tables_indexes_tabdb where db_type = '%s' and auth_id = '%s'" % (self.dbtype, self.keys), None)
-        params = (self.keys, self.dbtype, self.dbschema)
+        params = (self.keys, self.dbtype, self.schema)
         query = """
         SELECT 
             %s,
