@@ -38,13 +38,21 @@ def main():
     # 批量导出表采用配置表的方式，避免输入内容过多 或者配置过多，遍历引发效率降低
     cfgdb = modelgenerator_tabdb.Modelgenerator(dbsrc, dbmgr, dbtag)
     # 配置表文件判断
-    # bug。。。。。。
     if args.tabfile_flag is None or args.tabfile_flag.upper() == 'N':
-        # params = {'auth_id': cfgdb.keys}
-        # result = cfgdb.dbsrc_executor.dbfetchall(
-        #     "SELECT :auth_id,lower(table_name) FROM user_tables ORDER BY table_name", params)
-        result = cfgdb.dbsrc_executor.dbfetchall(
-            "SELECT %s,lower(table_name) FROM information_schema.tables where table_schema=%s ORDER BY table_name", (cfgdb.keys,'pma_pc'))
+        if cfgdb.dbtype.lower() == 'oracle':
+            result = cfgdb.dbsrc_executor.dbfetchall(
+                "SELECT :auth_id,lower(table_name) FROM user_tables ORDER BY table_name", {'auth_id': cfgdb.keys})
+        elif cfgdb.dbtype.lower() == 'mysql':
+            result = cfgdb.dbsrc_executor.dbfetchall(
+                "SELECT %s,lower(table_name) FROM information_schema.tables where table_schema=%s ORDER BY table_name",
+                    (cfgdb.keys, cfgdb.dbname))
+        elif cfgdb.dbtype.lower() == 'postgresql':
+            result = cfgdb.dbsrc_executor.dbfetchall(
+                "SELECT %s,lower(table_name) FROM information_schema.tables where table_schema=%s ORDER BY table_name",
+                    (cfgdb.keys, cfgdb.schema))
+        else:
+            mdtool.log.error('数据库类型错误')
+
         # 插入新数据前清空表
         cfgdb.dbmgr_executor.dbexecute("DELETE FROM cfg_tables WHERE auth_id = %s", (cfgdb.keys,))
         cfgdb.dbmgr_executor.dbexecutemany(

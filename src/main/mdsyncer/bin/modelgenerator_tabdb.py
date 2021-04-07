@@ -86,11 +86,22 @@ class Modelgenerator():
             self.passwd = value['passwd']
             self.dbtype = value['dbtype'].lower()
             self.dbname = value['dbname'].lower()
+            self.schema = None
+            if self.dbtype == 'postgresql':
+                if value.get('schema'):
+                    self.schema = value['schema']
+                else:
+                    self.schema = mdtool.Variable.PG_SCHEMA
+                    mdtool.log.warn("%s 库缺失schema" % self.keys)
         # 源库
         self.dbsrc_executor = mdtool.DbManager(self.host, self.port, self.user, self.passwd,
-                                               self.dbname, self.dbtype)
+                                               self.dbname, self.dbtype, self.schema)
 
         # 目标
+        # key
+        for key in dbtag.keys():
+            self.keys_tag = key
+        # value
         for value in dbtag.values():
             self.host_tag = value['host']
             self.port_tag = value['port']
@@ -98,9 +109,20 @@ class Modelgenerator():
             self.passwd_tag = value['passwd']
             self.dbname_tag = value['dbname']
             self.dbtype_tag = value['dbtype'].lower()
+            self.schema_tag = None
+            if self.dbtype_tag == 'postgresql':
+                if value.get('schema'):
+                    self.schema_tag = value['schema']
+                else:
+                    self.schema_tag = mdtool.Variable.PG_SCHEMA
+                    mdtool.log.warn("%s 库缺失schema" % self.keys_tag)
         # 目标库
         self.dbtag_executor = mdtool.DbManager(self.host_tag, self.port_tag, self.user_tag, self.passwd_tag,
-                                               self.dbname_tag, self.dbtype_tag)
+                                               self.dbname_tag, self.dbtype_tag, self.schema_tag)
+        # 管理库
+        # keys
+        for key in dbmgr.keys():
+            self.keys_mgr = key
         # values
         for value in dbmgr.values():
             self.host_mgr = value['host']
@@ -108,10 +130,17 @@ class Modelgenerator():
             self.user_mgr = value['user']
             self.passwd_mgr = value['passwd']
             self.dbname_mgr = value['dbname']
-            self.dbtype_mgr = value['dbtype']
+            self.dbtype_mgr = value['dbtype'].lower()
+            self.schema_mgr = None
+            if self.dbtype_mgr == 'postgresql':
+                if value.get('schema'):
+                    self.schema_mgr = value['schema']
+                else:
+                    self.schema_mgr = mdtool.Variable.PG_SCHEMA
+                    mdtool.log.warn("%s 库缺失schema" % self.keys_mgr)
         # 管理库
         self.dbmgr_executor = mdtool.DbManager(self.host_mgr, self.port_mgr, self.user_mgr, self.passwd_mgr,
-                                               self.dbname_mgr, self.dbtype_mgr)
+                                               self.dbname_mgr, self.dbtype_mgr, self.schema_mgr)
 
         # 表对象文件处理
         self.filedir_tab = mdtool.Variable.RST_PATH + os.sep + 'tables_generator' + os.sep + '%s2%s' % (
@@ -165,8 +194,10 @@ class Modelgenerator():
     def tablesGenerator(self):
         if self.dbtype == 'oracle':
             params = (self.dbtype, self.user, self.keys)
-        elif self.dbtype == 'mysql' or self.dbtype == 'postgresql':
+        elif self.dbtype == 'mysql':
             params = (self.dbtype, self.dbname, self.keys)
+        elif self.dbtype == 'postgresql':
+            params = (self.dbtype, self.schema, self.keys)
         query = """
         SELECT 
             lower(table_name) table_name
@@ -756,6 +787,10 @@ class Modeltodb():
         for value in dbsrc.values():
             self.dbtype = value['dbtype'].lower()
         # 目标
+        # key
+        for key in dbtag.keys():
+            self.key_tag = key
+        # value
         for value in dbtag.values():
             self.host_tag = value['host']
             self.port_tag = value['port']
@@ -763,9 +798,16 @@ class Modeltodb():
             self.passwd_tag = value['passwd']
             self.dbname_tag = value['dbname']
             self.dbtype_tag = value['dbtype'].lower()
+            self.schema_tag = None
+            if self.dbtype_tag == 'postgresql':
+                if value.get('schema'):
+                    self.schema_tag = value['schema']
+                else:
+                    self.schema_tag = mdtool.Variable.PG_SCHEMA
+                    mdtool.log.warn("%s 库缺失schema" % self.key_tag)
 
         self.dbtag_executor = mdtool.DbManager(self.host_tag, self.port_tag, self.user_tag, self.passwd_tag,
-                                               self.dbname_tag, self.dbtype_tag)
+                                               self.dbname_tag, self.dbtype_tag, self.schema_tag)
 
         self.filedir_tab = mdtool.Variable.RST_PATH + os.sep + 'tables_generator' + os.sep + '%s2%s' % (
             self.dbtype, self.dbtype_tag)

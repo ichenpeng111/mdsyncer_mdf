@@ -14,6 +14,9 @@ class ProfileGenerator():
         self.tables_in = tables_in
         # self.tables_in = 'TMP_METRIC_GATHER_AREA_0628'
         # 源
+        # key
+        for key in dbsrc.keys():
+            self.key = key
         for value in dbsrc.values():
             self.host = value['host']
             self.port = value['port']
@@ -21,8 +24,19 @@ class ProfileGenerator():
             self.passwd = value['passwd']
             self.dbname = value['dbname']
             self.dbtype = value['dbtype'].lower()
+            self.schema = None
+            if self.dbtype == 'postgresql':
+                if value.get('schema'):
+                    self.schema = value['schema']
+                else:
+                    self.schema = mdtool.Variable.PG_SCHEMA
+                    mdtool.log.warn("%s 管理库缺失schema" % self.key)
 
         # 目标
+        # key
+        for key in dbtag.keys():
+            self.key_tag = key
+        #value
         for value in dbtag.values():
             self.host_tag = value['host']
             self.port_tag = value['port']
@@ -30,10 +44,18 @@ class ProfileGenerator():
             self.passwd_tag = value['passwd']
             self.dbname_tag = value['dbname']
             self.dbtype_tag = value['dbtype'].lower()
+            self.schema_tag = None
+            if self.dbtype_tag == 'postgresql':
+                if value.get('schema'):
+                    self.schema_tag = value['schema']
+                else:
+                    self.schema_tag = mdtool.Variable.PG_SCHEMA
+                    mdtool.log.warn("%s 管理库缺失schema" % self.key_tag)
 
-        self.dbsrc_executor = mdtool.DbManager(self.host, self.port, self.user, self.passwd, self.dbname, self.dbtype)
+        self.dbsrc_executor = mdtool.DbManager(self.host, self.port, self.user, self.passwd, self.dbname, self.dbtype,
+                                               self.schema)
         self.dbtag_executor = mdtool.DbManager(self.host_tag, self.port_tag, self.user_tag, self.passwd_tag,
-                                               self.dbname_tag, self.dbtype_tag)
+                                               self.dbname_tag, self.dbtype_tag, self.schema_tag)
 
         self.JSON_PATH = mdtool.Variable.JSON_PATH
         self.JOB_PATH = mdtool.Variable.JOB_PATH
@@ -155,7 +177,7 @@ class ProfileGenerator():
                             tag = 'PG'
                         tag_jdbc = 'jdbc:%s://%s:%s/%s?useUnicode=true&characterEncoding=utf8' % (
                             self.dbtype_tag, self.host_tag, self.port_tag, self.dbname_tag)
-                        params = (table, self.dbname_tag)
+                        params = (table, self.dbname_tag.lower() if self.dbtype_tag == 'mysql' else self.schema_tag.lower())
                         query = """
                         SELECT count(1) FROM INFORMATION_SCHEMA.TABLES WHERE table_name = %s and table_schema = %s
                         """
@@ -168,11 +190,10 @@ class ProfileGenerator():
                             mdtool.log.info("%s在%s源数据库中存在，同时，也存在%s目标数据库"
                                             % (table, self.dbtype, self.dbtype_tag))
                             # 以目标库表字段为标准进行json配置
-                            params = (self.dbname_tag.lower(), table)
                             query = """
                             SELECT column_name FROM information_schema.columns
-                            WHERE table_schema = %s 
-                            AND table_name = %s
+                            WHERE table_name = %s
+                              and table_schema = %s 
                             ORDER BY ordinal_position
                             """
                             col_rst = self.dbtag_executor.dbfetchall(query, params)
@@ -202,8 +223,7 @@ class ProfileGenerator():
                             tag_col = '","'.join(col_array_tag)
                             src_col = ','.join(col_array_src)
                             src_sql = 'SELECT %s FROM %s' % (src_col, table)
-                            # tag_sql = 'TRUNCATE TABLE %s' % table
-                            tag_sql = ''
+                            tag_sql = 'delete from %s' % table
                             self.SedJson(src, src_jdbc, src_sql, tag, tag_col, tag_sql, tag_jdbc, table)
                     elif self.dbtype_tag == 'oracle':
                         tag_jdbc = 'jdbc:oracle:thin:@%s:%s:%s' % (self.host_tag, self.port_tag, self.dbname_tag)
@@ -257,7 +277,7 @@ class ProfileGenerator():
                 reserved_words = pg_reserved_words
             for table_elem in self.tables_in:
                 table = table_elem.lower()
-                params = (table, self.dbname.lower())
+                params = (table, self.dbname.lower() if self.dbtype == 'mysql' else self.schema.lower())
                 query = """
                 SELECT count(1) FROM information_schema.tables WHERE table_name = %s and table_schema = %s
                 """
@@ -312,16 +332,10 @@ class ProfileGenerator():
                     elif self.dbtype_tag == 'mysql' or self.dbtype_tag == 'postgresql':
                         tag_jdbc = 'jdbc:%s://%s:%s/%s?useUnicode=true&characterEncoding=utf8' % (
                             self.dbtype_tag, self.host_tag, self.port_tag, self.dbname_tag)
-                        params = (table, self.dbname_tag)
-                        # todo 写死schema 需要修改代码从配置文件读取
-                        #  query = """
-                        #         SELECT count(1) FROM INFORMATION_SCHEMA.TABLES WHERE table_name = %s and table_schema = %s
-                        #         """
-                        # result_tag = self.dbtag_executor.dbfetchone(query, params)
+                        params = (table, self.dbname_tag.lower() if self.dbtype_tag == 'mysql' else self.schema_tag.lower())
                         query = """
-                                SELECT count(1) FROM INFORMATION_SCHEMA.TABLES WHERE table_name = %s and table_schema = 'bspadmin'
+                                SELECT count(1) FROM INFORMATION_SCHEMA.TABLES WHERE table_name = %s and table_schema = %s
                                 """
-                        params = (table,)
                         result_tag = self.dbtag_executor.dbfetchone(query, params)
                         if result_tag[0] != 1:
                             mdtool.log.warning("%s在%s源数据库中存在，但是，在%s目标数据库不存在，请检查"
@@ -331,12 +345,10 @@ class ProfileGenerator():
                             mdtool.log.info("%s在%s源数据库中存在，同时，也存在%s目标数据库"
                                             % (table, self.dbtype, self.dbtype_tag))
                             # 以目标库表字段为标准进行json配置
-                            params = (self.dbname_tag, table)
-                            params = (table,)
                             query = """
                                     SELECT column_name FROM information_schema.columns
-                                    WHERE table_schema = 'bspadmin'
-                                    AND table_name = %s
+                                    WHERE table_name = %s 
+                                      and table_schema = %s
                                     ORDER BY ordinal_position
                                     """
                             col_rst = self.dbtag_executor.dbfetchall(query, params)
@@ -369,7 +381,7 @@ class ProfileGenerator():
                             tag_col = '","'.join(col_array_tag)
                             src_col = ','.join(col_array_src)
                             src_sql = 'SELECT %s FROM %s' % (src_col, table)
-                            tag_sql = 'TRUNCATE TABLE %s' % table
+                            tag_sql = 'DELETE FROM %s' % table
                             self.SedJson(src, src_jdbc, src_sql, tag, tag_col, tag_sql, tag_jdbc, table)
                     elif self.dbtype_tag == 'oracle':
                         tag_jdbc = 'jdbc:oracle:thin:@%s:%s:%s' % (
