@@ -4,6 +4,7 @@
 # @Param   : 
 # @File    : tmp_2.py
 ## test git 
+## test git fetch
 from multiprocessing.dummy import Pool
 import time
 import os
